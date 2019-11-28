@@ -5,7 +5,7 @@
 body { font: 12px Arial;}
 
 path { 
-    stroke:color(a);
+    stroke: steelblue;
     stroke-width: 2;
     fill: none;
 }
@@ -17,45 +17,52 @@ path {
     stroke-width: 1;
     shape-rendering: crispEdges;
 }
+.legend {
+    font-size: 16px;
+    font-weight: bold;
+    text-anchor: middle;
+}
+
+div.tooltip {	
+    position: absolute;			
+    text-align: center;			
+    width: 120px;					
+    height: 55px;					
+    padding: 2px;				
+    font: 12px sans-serif;		
+    background: lightsteelblue;	
+    border: 0px;		
+    border-radius: 8px;			
+    pointer-events: none;			
+}
 
 </style>
 <body>
 
 <!-- load the d3.js library -->    
-<script src="https://d3js.org/d3.v3.min.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
 
 <script>
 
 // Set the dimensions of the canvas / graph
 var margin = {top: 30, right: 20, bottom: 30, left: 50},
-    width = 600 - margin.left - margin.right,
-    height = 270 - margin.top - margin.bottom;
+    width = 1000 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
 
 // Parse the date / time
-var parseDate = d3.time.format("%Y-%m-%d").parse; 
-var color = d3.scaleOrdinal(d3.schemeCategory10);   // 選擇顏色類型
 
-
-
-
-
+var parseDate = d3.timeParse("%Y-%m-%d");
+//var Ymd = d3.time.format("%Y-%m-%d");
 
 
 // Set the ranges
-var x = d3.time.scale().range([0, width])
-//.scale().domain([minX,maxX]);
-var y = d3.scale.linear().range([height, 0])
-//.scale().domain([minY,maxY]);
+var x = d3.scaleTime().range([0, width-100]);  
+var y = d3.scaleLinear().range([height, 0]);
 
-// Define the axes
-var xAxis = d3.svg.axis().scale(x)
-    .orient("bottom").ticks(10);
 
-var yAxis = d3.svg.axis().scale(y)
-    .orient("left").ticks(10);
-
+	
 // Define the line
-var priceline = d3.svg.line()
+var priceline = d3.line()	
     .x(function(d) { return x(d.date); })
     .y(function(d) { return y(d.人口差); });
     
@@ -64,6 +71,7 @@ var svg = d3.select("body")
     .append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
+        //.call(zoom)
     .append("g")
         .attr("transform", 
               "translate(" + margin.left + "," + margin.top + ")");
@@ -73,41 +81,231 @@ d3.csv("https://raw.githubusercontent.com/Owen-Chang/demo/master/縣市人口統
     data.forEach(function(d) {
 		d.date = parseDate(d.date);
 		d.人口差 = +d.人口差;
+		//d.datetime = Ymd(d.date);
+		
     });
 
     // Scale the range of the data
     x.domain(d3.extent(data, function(d) { return d.date; }));
-    y.domain([-15000, d3.max(data, function(d) { return d.人口差; })]); 
+	y.domain(d3.extent(data, function(d) { return d.人口差; })); 
+
+	
+	
+	var div = d3.select("body").append("div")	
+    .attr("class", "tooltip")				
+    .style("opacity", 0);
 
     // Nest the entries by symbol
     var dataNest = d3.nest()
         .key(function(d) {return d.縣市;})
 		.entries(data);
-		
-	
 
-    // Loop through each symbol / key
-    dataNest.forEach(function(d) {
+
+	var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+
+    // Loop through each symbol / keys
+    dataNest.forEach(function(d,i) {
 
         svg.append("path")
-            .attr("class", "line")
-			.attr("d", priceline(d.values)); 
+			.attr("class", "line")
+			.style("stroke", function() { // Add the colours dynamically
+                return d.color = color(d.key); })
+            .attr("id", 'tag'+d.key.replace(/\s+/g, '')) // assign an ID
+			.attr("d", priceline(d.values))
+			.style("opacity", 0.5)
+            .on("mouseover", function(){
+                // Hide or show the elements based on the ID
+				
+				d3.selectAll("path.line")
+					.style("opacity", 0.1);
 
-		a= a+1
+				d3.select("#tag"+d.key.replace(/\s+/g, ''))
+                    .transition().duration(10) 
+					.style("opacity", 1);
+
+                // Update whether or not the elements are active
+                //d.active = active;
+				})
+			.on("mouseout", function() {
+
+				d3.selectAll("path.line")
+					.style("opacity", 0.5);
+						
+        })  
+
+
+		
+
+
+		svg.append("rect")
+			.attr("width", 15)
+  			.attr("height", 15)
+			.attr("x", 860)  // space legend
+			.attr("y", 0+i* (margin.bottom/2+3)-2)
+			.attr("class", "legend")
+        	.style("fill", function() { // Add the colours dynamically
+				return d.color = color(d.key); })
+
+			.on("mouseover", function(){
+                // Hide or show the elements based on the ID
+				
+				d3.selectAll("path.line")
+					.style("opacity", 0.1);
+
+				d3.select("#tag"+d.key.replace(/\s+/g, ''))
+					.style("opacity", 1);
+				})
+			.on("mouseout", function() {
+
+				d3.selectAll("path.line")
+					.style("opacity", 0.5);
+						
+            	
+        })  
+				
 			
+		svg.append("text")
+            .attr("x", 900)  // space legend
+			.attr("y", 0+i* (margin.bottom/2+3)+ 10)
+			.attr("class", "legend")    // style the legend
+			.style("fill", "black")
+            .on("mouseover", function(){
+                // Determine if current line is visible 
+                var active   = d.active ? false : true,
+                newOpacity = active ? 1 : 0; 
+                // Hide or show the elements based on the ID
+                d3.select("#tag"+d.key.replace(/\s+/g, ''))
+                    .transition().duration(10) 
+                    .style("opacity", newOpacity); 
+                // Update whether or not the elements are active
+                //d.active = active;
+				})
+			.on("mouseout", function() {		
+            	d3.select("#tag"+d.key.replace(/\s+/g, ''))
+                    .transition().duration(10) 
+                    .style("opacity", 0.1); 	
+        })  
+			.text(d.key);
 
+					
     });
+
+
+    svg.selectAll("dot")	
+        	.data(data)			
+		.enter().append("circle")
+			.attr("class", "dot")
+			.attr("opacity", 0)								
+        	.attr("r", 3)		
+        	.attr("cx", function(d) { return x(d.date); })		 
+			.attr("cy", function(d) { return y(d.人口差); })
+			.on("mouseover", function(d) {
+			d3.select(this)
+          		.transition().duration(10)
+	          	.style("fill", "steelblue")
+				 .attr("r", 5)
+				 .attr("opacity", 1);				
+            div.transition()		
+                .duration(10)		
+                .style("opacity", .9);		
+            div.html(d.date +"人口差:"+ d.人口差)	
+                .style("left", (d3.event.pageX) + "px")		
+				.style("top", (d3.event.pageY - 28) + "px");
+            d3.selectAll("path.line")
+				.style("opacity", 0);
+            d3.select("#tag"+d.縣市.replace(/\s+/g, ''))
+                .transition().duration(10) 
+				.style("opacity", 1);
+			
+			
+            })					
+            .on("mouseout", function(d) {		
+			d3.select(this)
+          		.transition().duration(10)
+	          	.style("fill", "steelblue")
+				 .attr("r", 5)
+				 .attr("opacity", 0);
+			div.transition()		
+                .duration(10)		
+				.style("opacity", 0);
+            d3.selectAll("path.line")
+				.style("opacity", 0.5);
+           
+					
+            });
+			
 
     // Add the X Axis
     svg.append("g")
         .attr("class", "x axis")
         .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
+        .call(d3.axisBottom(x));
 
     // Add the Y Axis
     svg.append("g")
         .attr("class", "y axis")
-		.call(yAxis);
+		.call(d3.axisLeft(y));
+
+
+
+
+
+    var zoom = d3.behavior.zoom()
+        .translate([0, 0])
+        .scaleExtent([1, 10])
+        .scale(1)
+        .on("zoom", zoomed);
+
+       /* function zoomed() {
+  x=d3.event.translate[0];
+  y=d3.event.translate[1];
+  s=d3.event.scale;
+  container.attr("transform", "translate(" + d3.event.translate + ") scale(" + d3.event.scale + ")");
+}*/
+
+   
+
+    
+
+
+
+
+	
+	
+	
+	/*var zooming = d3.zoom()
+        .scaleExtent([0.5, 10])
+        .extent([0, 0], [width-100,height])
+		.translateExtent([[-30, -30], [width-100+30, height+30]])
+        .on("zoom", zoom_update);
+
+			d3.selectAll(".line").call(zooming);
+			d3.selectall(".dot").call(zooming)
+
+      // zoom update function
+      function zoom_update() {
+        var newXScale = d3.event.transform.rescaleX(x);
+        var newYScale = d3.event.transform.rescaleY(y);
+
+        // update axes with these new boundaries
+        d3.selectAll(".x axis").call(d3.axisBottom(newXScale));
+        d3.selectAll(".y axis").call(d3.axisLeft(newYScale));
+
+        // update circle position
+        d3.selectAll(".dot")
+			.attr("cx", function(d) { return x(d.date); })		 
+			.attr("cy", function(d) { return y(d.人口差); })
+		  
+		d3.selectAll("path.line")
+			.attr("class", "line")
+			.style("stroke", function() { // Add the colours dynamically
+                return d.color = color(d.key); })
+            .attr("id", 'tag'+d.key.replace(/\s+/g, '')) // assign an ID
+			.attr("d", priceline(d.values))
+			.style("opacity", 0.1);
+      }
+*/
 	
  
 	
